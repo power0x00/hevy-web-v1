@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply antialiased;
+  }
+  
+  html {
+    @apply scroll-smooth;
+  }
+  
+  body {
+    @apply bg-background-light text-text-light dark:bg-background-dark dark:text-text-dark;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border-light dark:bg-border-dark rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-muted;
+  }
+}
+
+@layer components {
+  /* Button base styles */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply btn bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-gray-100 text-text-light hover:bg-gray-200 active:bg-gray-300;
+    @apply dark:bg-gray-800 dark:text-text-dark dark:hover:bg-gray-700;
+  }
+  
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800;
+  }
+  
+  .btn-danger {
+    @apply btn bg-accent-red text-white hover:bg-red-600 active:bg-red-700;
+  }
+  
+  /* Size variants */
+  .btn-sm {
+    @apply text-sm px-3 py-1.5 rounded-lg gap-1.5;
+  }
+  
+  .btn-md {
+    @apply text-base px-4 py-2 rounded-xl gap-2;
+  }
+  
+  .btn-lg {
+    @apply text-lg px-6 py-3 rounded-xl gap-2;
+  }
+  
+  /* Card styles */
+  .card {
+    @apply bg-surface-light dark:bg-surface-dark rounded-2xl shadow-soft;
+    @apply border border-border-light/50 dark:border-border-dark/50;
+  }
+  
+  .card-hover {
+    @apply card transition-all duration-200 hover:shadow-soft-lg hover:scale-[1.01];
+    @apply cursor-pointer active:scale-[0.99];
+  }
+  
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800;
+    @apply border border-transparent focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20;
+    @apply placeholder:text-text-muted transition-all duration-200;
+    @apply text-text-light dark:text-text-dark;
+  }
+  
+  /* Muscle group colors */
+  .muscle-chest { @apply text-red-500 bg-red-50 dark:bg-red-950/30; }
+  .muscle-back { @apply text-blue-500 bg-blue-50 dark:bg-blue-950/30; }
+  .muscle-shoulders { @apply text-purple-500 bg-purple-50 dark:bg-purple-950/30; }
+  .muscle-arms { @apply text-orange-500 bg-orange-50 dark:bg-orange-950/30; }
+  .muscle-legs { @apply text-green-500 bg-green-50 dark:bg-green-950/30; }
+  .muscle-core { @apply text-yellow-500 bg-yellow-50 dark:bg-yellow-950/30; }
+  .muscle-cardio { @apply text-pink-500 bg-pink-50 dark:bg-pink-950/30; }
+}
+
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
