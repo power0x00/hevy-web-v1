@@ -1,237 +1,321 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import { AppState, Workout, WorkoutExercise, WorkoutSet, Exercise, Routine, UserSettings } from '../types'
+import type { Workout, WorkoutExercise, WorkoutSet, Exercise, Routine, UserSettings, PersonalRecord } from '../types'
 
 // Local storage key
 const STORAGE_KEY = 'hevy_state'
 
-// Initial state
-const initialState: AppState = {
-  // Current workout
+// Initial settings
+const defaultSettings: UserSettings = {
+  name: 'Guest',
+  units: 'metric',
+  theme: 'system',
+  defaultRestTime: 90,
+  showWarmupSets: true,
+  soundEnabled: true,
+  hapticEnabled: false,
+}
+
+// Simple store type
+interface HevyState {
+  activeWorkout: Workout | null
+  workouts: Workout[]
+  routines: Routine[]
+  personalRecords: PersonalRecord[]
+  settings: UserSettings
+  isRestTimerActive: boolean
+  restTimeRemaining: number
+}
+
+export const useHevyStore = create<HevyState>()({
   activeWorkout: null,
-  
-  // History
   workouts: [],
-  
-  // Routines
   routines: [],
-  
-  // PRs
   personalRecords: [],
-  
-  // Settings
-  settings: {
-    name: 'Guest',
-    units: 'metric',
-    theme: 'system',
-    defaultRestTime: 90,
-    showWarmupSets: true,
-    soundEnabled: true,
-    hapticEnabled: false,
-  },
-  
-  // UI state
+  settings: defaultSettings,
   isRestTimerActive: false,
   restTimeRemaining: 0,
-}
-
-// Create store with persistence
-export const useHevyStore = create<AppState>()(
-  persist(
-    (state) => ({
-      activeWorkout: state.activeWorkout,
-      workouts: state.workouts,
-      routines: state.routines,
-      personalRecords: state.personalRecords,
-      settings: state.settings,
-      isRestTimerActive: state.isRestTimerActive,
-      restTimeRemaining: state.restTimeRemaining,
-    }),
-    {
-      name: STORAGE_KEY,
-      storage: createJSONStorage(() => JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'),
-    }
-  )
-)
+})
 
 // Actions
-export const workoutActions = {
-  setActiveWorkout: (workout: Workout | null) => 
-    set({ activeWorkout: workout }),
-  
-  completeWorkout: () => 
-    set(state => {
-      if (!state.activeWorkout) return
-      const workout = { ...state.activeWorkout, completedAt: new Date().toISOString() }
-      set({ activeWorkout: null })
-      set(state => ({
-        ...state,
-        workouts: [workout, ...state.workouts],
-        personalRecords: updatePersonalRecords(state, workout),
-      }))
-    }),
-  
-  addExerciseToWorkout: (exercise: Exercise) => 
-    set(state => {
-      if (!state.activeWorkout) return
-      
-      const newExercise: WorkoutExercise = {
+export const startWorkout = (name = 'Quick Workout', templateId = '') => {
+  useHevyStore.setState(state => {
+    const routine = templateId ? state.routines.find(r => r.id === templateId) : null
+    
+    const exercises = routine ? routine.exercises.map((re, idx) => ({
+      id: crypto.randomUUID(),
+      exerciseId: re.exerciseId,
+      notes: '',
+      supersetId: null,
+      sets: re.sets.length > 0 ? re.sets.map(s => ({
+        id: s.id,
+        weight: s.weight,
+        reps: s.reps,
+        duration: s.duration,
+        completed: s.completed,
+        isWarmup: s.isWarmup,
+        isDropset: s.isDropset,
+        isFailure: s.isFailure,
+      })) : [{
         id: crypto.randomUUID(),
-        exerciseId: exercise.id,
-        exercise,
-        sets: [{
-          id: crypto.randomUUID(),
-          weight: null,
-          reps: 8,
-          duration: null,
-          completed: false,
-          isWarmup: false,
-          isDropset: false,
-          isFailure: false,
-        }],
-        restTime: state.settings.defaultRestTime,
-        order: state.activeWorkout?.exercises.length || 0,
-      }
-      
-      set({ activeWorkout: {
-        ...state.activeWorkout!,
-        exercises: [...(state.activeWorkout?.exercises || []), newExercise],
-      } as Workout })
-    }),
-  
-  startNewWorkout: (templateId?: string) =>
-    set(state => {
-      const templateWorkout = state.routines.find(r => r.id === templateId)
-      const newWorkout: Workout = templateWorkout ? {
-        id: crypto.randomUUID(),
-        name: templateWorkout.name,
-        startedAt: new Date().toISOString(),
-        exercises: templateWorkout.exercises.map((re, idx) => ({
-          id: crypto.randomUUID(),
-          exerciseId: re.exerciseId,
-          order: idx,
-          sets: [{
-            id: crypto.randomUUID(),
-            weight: null,
-            reps: re.reps || 8,
-            duration: re.duration || null,
-            completed: false,
-            isWarmup: re.isWarmup || false,
-            isDropset: false,
-            isFailure: false,
-          }],
-        })),
-        templateId,
-      } : {
-        id: crypto.randomUUID(),
-        name: 'Quick Workout',
-        startedAt: new Date().toISOString(),
-        exercises: [],
-        notes: '',
-      }
-      
-      set({ activeWorkout: newWorkout })
-    }),
-  
-  completeSet: (exerciseId: string, setId: string) =>
-    set(state => {
-      if (!state.activeWorkout) return
-      
-      set(state => {
-        activeWorkout: {
-          ...state.activeWorkout!,
-          exercises: state.activeWorkout!.exercises.map(exercise => {
-            if (exercise.exerciseId === exerciseId) {
-              return {
-                ...exercise,
-                sets: exercise.sets.map(set => 
-                  set.id === setId ? { ...set, completed: true } : set
-                ),
-              }
-            }
-            return exercise
-          }),
-        } as Workout
-      })
-    }),
-  
-  updateSet: (exerciseId: string, setId: string, updates: Partial<WorkoutSet>) =>
-    set(state => {
-      if (!state.activeWorkout) return
-      
-      set(state => {
-        activeWorkout: {
-          ...state.activeWorkout!,
-          exercises: state.activeWorkout!.exercises.map(exercise => {
-            if (exercise.exerciseId === exerciseId) {
-              return {
-                ...exercise,
-                sets: exercise.sets.map(set => 
-                  set.id === setId ? { ...set, ...updates } : set
-                ),
-              }
-            }
-            return exercise
-          }),
-        } as Workout
-      })
-    }),
+        weight: null,
+        reps: 8,
+        duration: null,
+        completed: false,
+        isWarmup: false,
+        isDropset: false,
+        isFailure: false,
+      }],
+      order: idx,
+    }))
+    
+    const newWorkout: Workout = {
+      id: crypto.randomUUID(),
+      name,
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      duration: 0,
+      notes: '',
+      exercises,
+      bodyweight: null,
+      templateId: templateId || null,
+    }
+    
+    useHevyStore.setState({ activeWorkout: newWorkout })
+  })
 }
 
-// Helper to update personal records
-function updatePersonalRecords(state: AppState, workout: Workout): AppState {
-  if (!workout.completedAt) return state
+export const addExercise = (exercise: Exercise) => {
+  const state = useHevyStore.getState()
   
-  const workoutVolume = workout.exercises.reduce((total, exercise) => {
-    const exerciseVolume = exercise.sets.reduce((exerciseTotal, set) => {
-      if (set.weight && set.reps) {
-        return exerciseTotal + (set.weight * set.reps)
-      }
-      if (set.duration) {
-        return exerciseTotal + set.duration
-      }
-      return exerciseTotal
-    }, 0)
-    
-    return {
-      ...state,
-      personalRecords: state.personalRecords.map(record => {
-        // Keep the best record for each exercise
-        if (record.workoutId === workout.id && record.value < workoutVolume) {
+  if (!state.activeWorkout) {
+    return
+  }
+  
+  const newExercise: WorkoutExercise = {
+    id: crypto.randomUUID(),
+    exerciseId: exercise.id,
+    notes: '',
+    supersetId: null,
+    sets: [{
+      id: crypto.randomUUID(),
+      weight: null,
+      reps: 8,
+      duration: null,
+      completed: false,
+      isWarmup: false,
+      isDropset: false,
+      isFailure: false,
+    }],
+    restTime: state.settings.defaultRestTime,
+    order: state.activeWorkout?.exercises.length || 0,
+  }
+  
+  useHevyStore.setState(state => ({
+    activeWorkout: {
+      ...state.activeWorkout,
+      exercises: [...(state.activeWorkout?.exercises || []), newExercise],
+    }
+  }))
+}
+
+export const removeExercise = (exerciseId: string) => {
+  const state = useHevyStore.getState()
+  
+  if (!state.activeWorkout) {
+    return
+  }
+  
+  useHevyStore.setState(state => ({
+    activeWorkout: {
+      ...state.activeWorkout,
+      exercises: state.activeWorkout.exercises.filter(e => e.id !== exerciseId),
+    }
+  }))
+}
+
+export const addSet = (exerciseId: string) => {
+  const state = useHevyStore.getState()
+  
+  if (!state.activeWorkout) {
+    return
+  }
+  
+  const newSet: WorkoutSet = {
+    id: crypto.randomUUID(),
+    weight: null,
+    reps: 8,
+    duration: null,
+    completed: false,
+    isWarmup: false,
+    isDropset: false,
+    isFailure: false,
+  }
+  
+  useHevyStore.setState(state => ({
+    activeWorkout: {
+      ...state.activeWorkout,
+      exercises: state.activeWorkout.exercises.map(e => {
+        if (e.exerciseId === exerciseId) {
           return {
-            ...record,
-            value: workoutVolume,
-            workoutId: workout.id,
-            date: workout.startedAt.split('T')[0],
+            ...e,
+            sets: [...e.sets, newSet]
           }
         }
-        return record
-      })
+        return e
+      }),
     }
+  }))
+}
+
+export const removeSet = (exerciseId: string, setId: string) => {
+  const state = useHevyStore.getState()
+  
+  if (!state.activeWorkout) {
+    return
+  }
+  
+  useHevyStore.setState(state => ({
+    activeWorkout: {
+      ...state.activeWorkout,
+      exercises: state.activeWorkout.exercises.map(e => {
+        if (e.exerciseId === exerciseId) {
+          return {
+            ...e,
+            sets: e.sets.filter(s => s.id !== setId)
+          }
+        }
+        return e
+      }),
+    }
+  }))
+}
+
+export const completeSet = (exerciseId: string, setId: string) => {
+  const state = useHevyStore.getState()
+  
+  if (!state.activeWorkout) {
+    return
+  }
+  
+  const exercise = state.activeWorkout.exercises.find(e => e.exerciseId === exerciseId)
+  if (!exercise) {
+    return
+  }
+  
+  useHevyStore.setState(state => {
+    activeWorkout: {
+      ...state.activeWorkout,
+      exercises: state.activeWorkout.exercises.map(e => {
+        if (e.exerciseId !== exerciseId) return e
+        return {
+          ...e,
+          sets: e.sets.map(s => {
+            if (s.id === setId) {
+              return {
+                ...s,
+                completed: true,
+                completedAt: new Date().toISOString()
+              }
+            }
+            return s
+          })
+        }
+      })
+    })
+  
+  const exercise = state.activeWorkout.exercises.find(e => e.exerciseId === exerciseId)
+  if (exercise && exercise.restTime) {
+    useHevyStore.setState({ isRestTimerActive: true, restTimeRemaining: exercise.restTime })
+  }
+}
+
+export const completeWorkout = () => {
+  const state = useHevyStore.getState()
+  
+  if (!state.activeWorkout) {
+    return
+  }
+  
+  const completedWorkout: Workout = {
+    ...state.activeWorkout,
+    completedAt: new Date().toISOString(),
+    duration: Math.floor((Date.now() - new Date(state.activeWorkout.startedAt).getTime()) / 1000),
+  }
+  
+  const workouts = [completedWorkout, ...state.workouts]
+  
+  useHevyStore.setState({
+    activeWorkout: null,
+    workouts,
+  })
+}
+
+export const cancelWorkout = () => {
+  useHevyStore.setState({ activeWorkout: null })
+}
+
+// Routine actions
+export const createRoutine = (routineData) => {
+  const routine = {
+    ...routineData,
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+  
+  useHevyStore.setState(state => ({
+    routines: [...state.routines, routine]
+  }))
+}
+
+export const deleteRoutine = (id: string) => {
+  useHevyStore.setState(state => ({
+    routines: state.routines.filter(r => r.id !== id)
+  }))
 }
 
 // Settings actions
-export const settingsActions = {
-  updateSettings: (settings: Partial<UserSettings>) =>
-    set(state => ({ settings: { ...state.settings, ...settings } })),
+export const updateSettings = (updates) => {
+  useHevyStore.setState(state => ({
+    settings: { ...state.settings, ...updates }
+  }))
+}
+
+// Timer actions
+export const startRestTimer = (seconds: number) => {
+  useHevyStore.setState({
+    isRestTimerActive: true,
+    restTimeRemaining: seconds
+  })
+}
+
+export const stopRestTimer = () => {
+  useHevyStore.setState({
+    isRestTimerActive: false,
+    restTimeRemaining: 0
+  })
+}
+
+export const tickRestTimer = () => {
+  const state = useHevyStore.getState()
   
-  updateTheme: (theme: 'light' | 'dark' | 'system') =>
-    set(state => ({ 
-      settings: { ...state.settings, theme } 
-    })),
-  
-  toggleRestTimer: () =>
-    set(state => ({ isRestTimerActive: !state.isRestTimerActive })),
-  
-  setRestTimer: (active: boolean, timeRemaining: number = 0) =>
-    set({ isRestTimerActive: active, restTimeRemaining: timeRemaining }),
+  if (state.restTimeRemaining <= 1) {
+    useHevyStore.setState({
+      isRestTimerActive: false,
+      restTimeRemaining: 0
+    })
+  } else {
+    useHevyStore.setState({
+      restTimeRemaining: state.restTimeRemaining - 1
+    })
+  }
 }
 
 // Selectors
-export const selectActiveWorkout = (state: AppState) => state.activeWorkout
-export const selectWorkouts = (state: AppState) => state.workouts
-export const selectRoutines = (state: AppState) => state.routines
-export const selectPersonalRecords = (state: AppState) => state.personalRecords
-export const selectSettings = (state: AppState) => state.settings
-export const selectIsRestTimerActive = (state: AppState) => state.isRestTimerActive
-export const selectRestTimeRemaining = (state: AppState) => state.restTimeRemaining
+export const selectActiveWorkout = (state: HevyState) => state.activeWorkout
+export const selectWorkouts = (state: HevyState) => state.workouts
+export const selectRoutines = (state: HevyState) => state.routines
+export const selectPersonalRecords = (state: HevyState) => state.personalRecords
+export const selectSettings = (state: HevyState) => state.settings
+export const selectIsRestTimerActive = (state: HevyState) => state.isRestTimerActive
+export const selectRestTimeRemaining = (state: HevyState) => state.restTimeRemaining
